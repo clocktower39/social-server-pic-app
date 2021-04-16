@@ -20,24 +20,37 @@ let corsWhitelist = [
     'http://mattkearns.ddns.net:3001',
     '*'];
 
-let Message = mongoose.model('Message', {
-    name: String,
-    message: String
-});
 
-let imageSchema = new mongoose.Schema({
-    name: String,
-    desc: String,
-    img:
-    {
-        data: Buffer,
-        contentType: String
-    }
+let User = mongoose.model('Message', {
+    username: String,
+    firstName: String,
+    lastName: String,
+    email: String,
 });
     
 app.get('/', (req,res) => {
-    res.send(req.connection.remoteAddress)
-    console.log(req.connection.remoteAddress);
+    res.send(req.socket.remoteAddress)
+    console.log(req.socket.remoteAddress);
+})
+
+app.post('/login', (req, res) => {
+    res.send(req.socket.remoteAddress)
+})
+
+app.post('/signup', (req, res) => {
+    let user = new User(req.body);
+    
+    let saveUser = () => {
+        user.save((err)=>{
+            if(err){
+                sendStatus(500);
+            }
+            else{
+                res.sendStatus(200);
+            }
+        });
+    }
+    saveUser();
 })
 
 mongoose.connect(dbUrl, 
