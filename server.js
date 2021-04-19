@@ -2,9 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 const http = require('http').Server(app);
-const io = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const io = require('socket.io');
+const bcrypt = require('bcrypt'),
+ SALT_WORK_FACTOR = 10;
 require('dotenv').config();
 
 console.log(process.env.YUM);
@@ -20,14 +22,36 @@ let corsWhitelist = [
     'http://mattkearns.ddns.net:3001',
     '*'];
 
-
-let User = mongoose.model('Message', {
-    username: String,
-    firstName: String,
-    lastName: String,
-    email: String,
+let UserSchema = mongoose.Schema({
+    username: { type: String, required: true, index: { unique: true } },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true },
+    password: { type: String, required: true },
 });
-    
+
+UserSchema.pre('save', function(next) {
+    let user = this;
+
+    // only hash the password if it has been modified (or is new)
+    if (!user.isModified('password')) return next();
+
+    // generate a salt
+    bcrypt.genSalt(SALT_WORK_FACTOR, function(err, salt) {
+        if (err) return next(err);
+
+        // hash the password using our new salt
+        bcrypt.hash(user.password, salt, function(err, hash) {
+            if (err) return next(err);
+            // override the cleartext password with the hashed one
+            user.password = hash;
+            next();
+        });
+    });
+});
+
+let User = mongoose.model('User', UserSchema);
+
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress)
     console.log(req.socket.remoteAddress);
@@ -43,7 +67,7 @@ app.post('/signup', (req, res) => {
     let saveUser = () => {
         user.save((err)=>{
             if(err){
-                sendStatus(500);
+                res.send('Username already taken or missing required field(s)');
             }
             else{
                 res.sendStatus(200);
