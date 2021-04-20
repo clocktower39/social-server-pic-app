@@ -13,6 +13,7 @@ const dbUrl = process.env.DBURL;
 const PORT = process.env.PORT;
 const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 
+app.use(cors());
 app.use(express.static(__dirname));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
@@ -65,13 +66,23 @@ app.get('/', (req,res) => {
 })
 
 app.post('/login', (req, res) => {
-    res.send(req.socket.remoteAddress);
     User.findOne({ username: req.body.username }, function(err, user) {
         if (err) throw err;
-        user.comparePassword(req.body.password, function(err, isMatch) {
-            if (err) throw err;
-            console.log('isMatch:', isMatch);
-        });
+        if(!user){
+            res.send({authenticated: false})
+        }
+        else {
+            console.log('here');
+            console.log(user);
+            user.comparePassword(req.body.password, function(err, isMatch) {
+                if (err) throw err;
+                (!isMatch)?res.send({authenticated: isMatch}):
+                res.send({
+                    authenticated: isMatch,
+                    user: user
+                })
+            });
+        }
     });
 })
 
