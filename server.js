@@ -64,8 +64,7 @@ UserSchema.methods.comparePassword = function(candidatePassword, cb) {
 let User = mongoose.model('User', UserSchema);
 
 app.get('/', (req,res) => {
-    res.send(req.socket.remoteAddress)
-    console.log(req.socket.remoteAddress);
+    res.send(req.socket.remoteAddress);
 })
 
 app.post('/login', (req, res) => {
@@ -75,8 +74,6 @@ app.post('/login', (req, res) => {
             res.send({authenticated: false})
         }
         else {
-            console.log('here');
-            console.log(user);
             user.comparePassword(req.body.password, function(err, isMatch) {
                 if (err) throw err;
 
@@ -89,6 +86,19 @@ app.post('/login', (req, res) => {
             });
         }
     });
+})
+
+app.post('/search', (req, res) => {
+    if(req.body.username === '') {
+        res.send({users: []});
+    }
+    else {
+        let searchUser = new RegExp(req.body.username,'i');
+        User.find({ username: searchUser }, function(err, users) {
+            if (err) throw err;
+            res.send({users: users})
+        });
+    }
 })
 
 app.post('/signup', (req, res) => {
