@@ -29,6 +29,9 @@ let UserSchema = mongoose.Schema({
     lastName: { type: String, required: true },
     email: { type: String, required: true },
     password: { type: String, required: true },
+    description: { type: String },
+    posts: { type: Array },
+    following: { type: Array },
 });
 
 UserSchema.pre('save', function(next) {
@@ -76,10 +79,12 @@ app.post('/login', (req, res) => {
             console.log(user);
             user.comparePassword(req.body.password, function(err, isMatch) {
                 if (err) throw err;
-                (!isMatch)?res.send({authenticated: isMatch}):
+
+                //if the password does not match and previous session was not authenticated, do not authenticate
+                (!isMatch && !req.body.authenticated)?res.send({authenticated: false}):
                 res.send({
-                    authenticated: isMatch,
-                    user: user
+                    authenticated: true,
+                    user: user._doc
                 })
             });
         }
