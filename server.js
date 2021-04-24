@@ -78,17 +78,35 @@ app.post('/login', (req, res) => {
                 if (err) throw err;
 
                 //if the password does not match and previous session was not authenticated, do not authenticate
-                (!isMatch && !req.body.authenticated)?res.send({authenticated: false}):
-                res.send({
-                    authenticated: true,
-                    user: user._doc
-                })
+                if(req.body.authenticated && isMatch || req.body.authenticated === 'true'){
+                    res.send({
+                        authenticated: true,
+                        user: user._doc
+                    })
+                }
+                else{
+                    res.send({
+                        authenticated: false
+                    })
+                }
             });
         }
     });
 })
 
+app.post('/home/posts', (req, res) => {
+    // Recieve list of usernames to load posts for
+    let requestList = req.body.following;
+
+    // Creat mongoose Post model
+    // find all posts from models that are on the request list
+    // sort the list by timeStamp
+    // send data back to client 
+    res.send({posts: posts})    
+})
+
 app.post('/search', (req, res) => {
+    // if search string is empty, return no users instead of all
     if(req.body.username === '') {
         res.send({users: []});
     }
