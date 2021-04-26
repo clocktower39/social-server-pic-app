@@ -98,7 +98,7 @@ app.post('/home/posts', (req, res) => {
     // Recieve list of usernames to load posts for
     let requestList = req.body.following;
 
-    // Creat mongoose Post model
+    // Create mongoose Post model
     // find all posts from models that are on the request list
     // sort the list by timeStamp
     // send data back to client 
@@ -119,16 +119,24 @@ app.post('/search', (req, res) => {
     }
 })
 
+app.post('/updateAccount', (req, res) => {
+    // update username, firstName, lastName, description, email
+})
+
 app.post('/signup', (req, res) => {
     let user = new User(req.body);
     
     let saveUser = () => {
         user.save((err)=>{
             if(err){
-                res.send('Username already taken or missing required field(s)');
+                res.send({
+                    error:'Username already taken or missing required field(s)'
+                });
             }
             else{
-                res.sendStatus(200);
+                res.send({
+                    status: 'success'
+                })
             }
         });
     }
