@@ -126,6 +126,13 @@ app.post('/search', (req, res) => {
     }
 })
 
+app.post('/followUser', (req, res) => {
+    User.findOneAndUpdate({ username: req.body.username }, { following: req.body.following }, function(err, udpate) {
+        if (err) throw err;
+        res.send({udpate})
+    });
+})
+
 app.post('/followers', (req, res) => {
     User.find({ following: req.body.username}, function(err, users) {
         if(err) throw err;
