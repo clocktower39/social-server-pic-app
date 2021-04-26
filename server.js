@@ -129,9 +129,7 @@ app.post('/signup', (req, res) => {
     let saveUser = () => {
         user.save((err)=>{
             if(err){
-                res.send({
-                    error:'Username already taken or missing required field(s)'
-                });
+                res.send({error: {...err.errors}});
             }
             else{
                 res.send({
