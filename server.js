@@ -126,6 +126,14 @@ app.post('/search', (req, res) => {
     }
 })
 
+app.post('/followers', (req, res) => {
+    User.find({ following: req.body.username}, function(err, users) {
+        if(err) throw err;
+        let usernameList = users.map(user=> user.username);
+        res.send({followers: usernameList})
+    })
+})
+
 app.post('/updateAccount', (req, res) => {
     // update username, firstName, lastName, description, email
 })
