@@ -32,6 +32,7 @@ let UserSchema = mongoose.Schema({
     description: { type: String },
     posts: { type: Array },
     following: { type: Array },
+    followers: { type: Array },
 });
 
 UserSchema.pre('save', function(next) {
@@ -101,15 +102,30 @@ app.post('/login', (req, res) => {
     });
 })
 
-app.post('/home/posts', (req, res) => {
-    // Recieve list of usernames to load posts for
+app.post('/getPosts', (req, res) => {
+    // Recieve list of usernames to load posts for home page
+    let postList = [];
     let requestList = req.body.following;
-
-    // Create mongoose Post model
-    // find all posts from models that are on the request list
-    // sort the list by timeStamp
-    // send data back to client 
-    res.send({posts: posts})    
+    User.find({ username: requestList }, function(err, users) {
+        if (err) throw err;
+        users.forEach(user => {
+            user.posts.forEach(post => {
+                post.user = {
+                    username: user.username,
+                    profilePic: user._doc.profilePic,
+                }
+            })
+            postList.push(...user.posts);
+        })
+    }).then(()=>{
+        // Create mongoose Post model
+        // find all posts from models that are on the request list
+        // sort the list by timeStamp
+        postList.sort((a,b)=>{
+            return b.timeStamp- a.timeStamp
+        });
+        res.send({posts: postList})
+    });
 })
 
 app.post('/search', (req, res) => {
@@ -155,7 +171,8 @@ app.post('/signup', (req, res) => {
             }
             else{
                 res.send({
-                    status: 'success'
+                    status: 'success',
+                    user
                 })
             }
         });
