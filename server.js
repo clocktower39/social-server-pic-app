@@ -122,8 +122,9 @@ app.post('/getPosts', (req, res) => {
         // find all posts from models that are on the request list
         // sort the list by timeStamp
         postList.sort((a,b)=>{
-            return b.timeStamp- a.timeStamp
+            return b.timeStamp - a.timeStamp
         });
+    }).then(()=>{
         res.send({posts: postList})
     });
 })
