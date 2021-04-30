@@ -1,5 +1,4 @@
-
-module.exports = function (app, User) {
+module.exports = (app, User) => {
     app.post('/login', (req, res) => {
         User.findOne({ username: req.body.username }, function(err, user) {
             if (err) throw err;

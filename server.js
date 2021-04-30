@@ -68,63 +68,15 @@ let User = mongoose.model('User', UserSchema);
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
 })
-require('./login.js')(app, User);
+require('./Routes/login.js')(app, User);
 
-app.post('/getPosts', (req, res) => {
-    // Recieve list of usernames to load posts for home page
-    let postList = [];
-    let requestList = req.body.following;
-    User.find({ username: requestList }, function(err, users) {
-        if (err) throw err;
-        users.forEach(user => {
-            user.posts.forEach(post => {
-                post.user = {
-                    username: user.username,
-                    profilePic: user._doc.profilePic,
-                }
-            })
-            postList.push(...user.posts);
-        })
-    }).then(()=>{
-        // Create mongoose Post model
-        // find all posts from models that are on the request list
-        // sort the list by timeStamp
-        postList.sort((a,b)=>{
-            return b.timeStamp - a.timeStamp
-        });
-    }).then(()=>{
-        res.send({posts: postList})
-    });
-})
+require('./Routes/getPosts.js')(app, User);
 
-app.post('/search', (req, res) => {
-    // if search string is empty, return no users instead of all
-    if(req.body.username === '') {
-        res.send({users: []});
-    }
-    else {
-        let searchUser = new RegExp(req.body.username,'i');
-        User.find({ username: searchUser }, function(err, users) {
-            if (err) throw err;
-            res.send({users: users})
-        });
-    }
-})
+require('./Routes/search.js')(app, User);
 
-app.post('/followUser', (req, res) => {
-    User.findOneAndUpdate({ username: req.body.username }, { following: req.body.following }, function(err, udpate) {
-        if (err) throw err;
-        res.send({udpate})
-    });
-})
+require('./Routes/followUser.js')(app, User);
 
-app.post('/followers', (req, res) => {
-    User.find({ following: req.body.username}, function(err, users) {
-        if(err) throw err;
-        let usernameList = users.map(user=> user.username);
-        res.send({followers: usernameList})
-    })
-})
+require('./Routes/followers.js')(app, User);
 
 app.post('/updateAccount', (req, res) => {
     // update username, firstName, lastName, description, email
