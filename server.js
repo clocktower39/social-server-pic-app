@@ -17,6 +17,7 @@ app.use(cors());
 app.use(express.static(__dirname));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
+mongoose.set('useFindAndModify', false);
 
 let corsWhitelist = [
     'http://10.37.39.39:3001',
@@ -67,40 +68,7 @@ let User = mongoose.model('User', UserSchema);
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
 })
-
-app.post('/login', (req, res) => {
-    User.findOne({ username: req.body.username }, function(err, user) {
-        if (err) throw err;
-        if(!user){
-            res.send({
-                authenticated: false,
-                error: {username: 'Username not found'}
-            })
-        }
-        else {
-            user.comparePassword(req.body.password, function(err, isMatch) {
-                if (err){
-                    res.send({
-                        authenticated: false,
-                    })
-                }
-                //if the password does not match and previous session was not authenticated, do not authenticate
-                if(req.body.authenticated && isMatch || req.body.authenticated === 'true'){
-                    res.send({
-                        authenticated: true,
-                        user: user._doc
-                    })
-                }
-                else{
-                    res.send({
-                        authenticated: false,
-                        error: {password: 'Incorrect Password'}
-                    })
-                }
-            });
-        }
-    });
-})
+require('./login.js')(app, User);
 
 app.post('/getPosts', (req, res) => {
     // Recieve list of usernames to load posts for home page
