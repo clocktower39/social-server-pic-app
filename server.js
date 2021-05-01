@@ -78,28 +78,9 @@ require('./Routes/followUser.js')(app, User);
 
 require('./Routes/followers.js')(app, User);
 
-app.post('/updateAccount', (req, res) => {
-    // update username, firstName, lastName, description, email
-})
+require('./Routes/updateAccount.js')(app, User);
 
-app.post('/signup', (req, res) => {
-    let user = new User(req.body);
-    
-    let saveUser = () => {
-        user.save((err)=>{
-            if(err){
-                res.send({error: {...err.errors}});
-            }
-            else{
-                res.send({
-                    status: 'success',
-                    user
-                })
-            }
-        });
-    }
-    saveUser();
-})
+require('./Routes/signup.js')(app, User);
 
 mongoose.connect(dbUrl, 
     {
