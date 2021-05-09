@@ -10,7 +10,10 @@ require('dotenv').config();
 
 console.log(process.env.YUM);
 const dbUrl = process.env.DBURL;
-const PORT = process.env.PORT;
+let PORT = process.env.PORT;
+if( PORT == null || PORT == ""){
+    PORT = 8000;
+}
 const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 
 app.use(cors());
