@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const io = require('socket.io');
 const bcrypt = require('bcrypt');
-require('dotenv').config();
+// require('dotenv').config();
 
 console.log(process.env.YUM);
 const dbUrl = process.env.DBURL;
