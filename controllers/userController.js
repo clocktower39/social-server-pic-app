@@ -1,4 +1,6 @@
 const User = require('../models/user');
+const jwt = require("jsonwebtoken");
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 const get_followers = (req, res) => {
     User.find({ following: req.body.username}, function(err, users) {
@@ -58,11 +60,12 @@ const login_user = (req, res) => {
                         authenticated: false,
                     })
                 }
-                //if the password does not match and previous session was not authenticated, do not authenticate
-                if(req.body.authenticated && isMatch || req.body.authenticated === 'true'){
+                if(isMatch){
+                    const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
+                        expiresIn: '30d'
+                    });
                     res.send({
-                        authenticated: true,
-                        user: user._doc
+                        accessToken: accessToken,
                     })
                 }
                 else{
@@ -74,6 +77,10 @@ const login_user = (req, res) => {
             });
         }
     });
+}
+
+const checkAuthLoginToken = (req, res) => {
+  res.send('Authorized')
 }
 
 const signup_user = (req, res) => {
@@ -114,6 +121,7 @@ const update_user = (req, res) => {
 }
 
 module.exports = {
+    checkAuthLoginToken,
     get_followers,
     follow_user,
     get_posts,
