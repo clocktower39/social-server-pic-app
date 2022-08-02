@@ -10,10 +10,13 @@ const UserSchema = mongoose.Schema({
     email: { type: String, required: true },
     password: { type: String, required: true },
     description: { type: String },
-    posts: { type: Array },
-    following: { type: Array },
-    followers: { type: Array },
-});
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    profilePicture: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "profilePictures.files"
+    },
+}, { minimize: false });
 
 UserSchema.pre('save', function(next) {
     let user = this;
