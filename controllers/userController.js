@@ -1,64 +1,24 @@
 const User = require('../models/user');
 const Post = require('../models/post');
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-
-const get_followers = (req, res) => {
-    User.find({ following: req.body.username }, function (err, users) {
-        if (err) throw err;
-        let usernameList = users.map(user => user.username);
-        res.send({ followers: usernameList })
-    })
-}
-
-const follow_user = (req, res) => {
-    User.findOneAndUpdate({ username: req.body.username }, { following: req.body.following }, function (err, udpate) {
-        if (err) throw err;
-        res.send({ udpate })
-    });
-}
-
-const get_posts = (req, res) => {
-    // Recieve list of usernames to load posts for home page
-    let postList = [];
-    let requestList = req.body.following;
-    User.find({ username: requestList }, function (err, users) {
-        if (err) throw err;
-        users.forEach(user => {
-            user.posts.forEach(post => {
-                post.user = {
-                    username: user.username,
-                    profilePic: user._doc.profilePic,
-                }
-            })
-            postList.push(...user.posts);
-        })
-    }).then(() => {
-        // Create mongoose Post model
-        // find all posts from models that are on the request list
-        // sort the list by timeStamp
-        postList.sort((a, b) => {
-            return b.timeStamp - a.timeStamp
-        });
-    }).then(() => {
-        res.send({ posts: postList })
-    });
-}
 
 const get_following_posts = async (req, res) => {
     // Recieve list of usernames to load posts for home page
     const user = await User.findById(res.locals.user._id);
-    const postRequest = user.following.map( f => {
+    user.following.push(user._id);
+    const postRequest = user.following.map(f => {
         return Post.find({ user: f })
-        .populate('user', 'username profilePicture')
-        .populate('comments', 'comment')
-        .populate('comments.user', 'username profilePicture')
-        .populate('likes', 'username profilePicture')
-        .exec();
+            .populate('user', 'username profilePicture')
+            .populate('comments', 'comment')
+            .populate('comments.user', 'username profilePicture')
+            .populate('likes', 'username profilePicture')
+            .exec();
     })
     const postResponse = await Promise.all(postRequest);
 
-    const sortedPosts = postResponse.flat().sort((a,b) => b.timestamp - a.timestamp);
+    const sortedPosts = postResponse.flat().sort((a, b) => b.timestamp - a.timestamp);
     res.send(sortedPosts);
 }
 
@@ -134,18 +94,104 @@ const search_user = (req, res) => {
     }
 }
 
-const update_user = (req, res) => {
-    // update username, firstName, lastName, description, email
+const upload_profile_picture = (req, res) => {
+    User.findOneAndUpdate({ username: res.locals.user.username }, { profilePicture: res.req.file.id }, (err, user) => {
+        if (err) {
+            return res.send(err);
+        }
+
+        console.log(res.req.file.filename)
+        return res.json({ src: res.req.file.filename })
+    })
+}
+
+const get_profile_picture = (req, res) => {
+    if (req.params.id) {
+        let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+            bucketName: 'profilePicture'
+        });
+
+        gridfsBucket.find({ _id: mongoose.Types.ObjectId(req.params.id) }).toArray((err, files) => {
+            // Check if files
+            if (!files || files.length === 0) {
+                return res.status(404).json({
+                    err: 'No files exist'
+                });
+            }
+
+            // Check if image
+            if (files[0].contentType === 'image/jpeg' || files[0].contentType === 'image/png') {
+                // Read output to browser
+                const readstream = gridfsBucket.openDownloadStream(files[0]._id);
+                readstream.pipe(res);
+            } else {
+                res.status(404).json({
+                    err: 'Not an image'
+                });
+            }
+        });
+    }
+    else {
+        res.status(404).json({
+            err: 'Missing parameter',
+        })
+    }
+}
+
+const delete_profile_picture = (req, res) => {
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'profilePicture'
+    });
+
+    User.findById(res.locals.user._id, (err, user) => {
+        if (err) return res.send(err);
+        if (user.profilePicture) {
+            gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
+            user.profilePicture = undefined;
+            user.save((err, u) => {
+                if (err) return res.send(err);
+                return res.sendStatus(200);
+            });
+        }
+        else {
+            return res.sendStatus(204);
+        }
+    })
+
+
+}
+
+const get_user_profile_page = (req, res) => {
+    User.findOne({ username: req.params.username }, async function (err, user) {
+        if (err) throw err;
+        if(user){
+            user.email = undefined;
+            user.password = undefined;
+    
+            const posts = await Post.find({ user: user._id })
+                .populate('user', 'username profilePicture')
+                .populate('comments', 'comment')
+                .populate('comments.user', 'username profilePicture')
+                .populate('likes', 'username profilePicture')
+                .exec();
+    
+            res.send({ user, posts })
+        }
+        else {
+            res.send({ err: "No User found"})
+        }
+
+    });
 }
 
 module.exports = {
     checkAuthLoginToken,
-    get_followers,
-    follow_user,
-    get_posts,
     get_following_posts,
     login_user,
     signup_user,
     search_user,
-    update_user,
+    upload_profile_picture,
+    get_profile_picture,
+    delete_profile_picture,
+    get_user_profile_page,
 }
