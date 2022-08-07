@@ -8,6 +8,7 @@ require('dotenv').config();
 const methodOverride = require('method-override');
 const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
+const relationshipRoutes = require('./routes/relationshipRoutes');
 
 const dbUrl = process.env.DBURL;
 let PORT = process.env.PORT;
@@ -22,6 +23,7 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.use(methodOverride('_method'));
 app.use('/', userRoutes);
 app.use('/', postRoutes);
+app.use('/', relationshipRoutes);
 
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
