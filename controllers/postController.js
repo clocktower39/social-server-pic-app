@@ -1,5 +1,6 @@
 const User = require('../models/user');
 const Post = require('../models/post');
+const Relationship = require('../models/relationship');
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
@@ -56,7 +57,28 @@ const get_post_image = (req, res) => {
     }
 }
 
+const get_following_posts = async (req, res) => {
+    // Recieve list of usernames to load posts for home page
+    const followingList = await Relationship.find({ follower: res.locals.user._id });
+    let following = followingList.map(r => r.user);
+    following.push(res.locals.user._id);
+
+    const postRequest = following.map(user => {
+        return Post.find({ user })
+            .populate('user', 'username profilePicture')
+            .populate('comments', 'comment')
+            .populate('comments.user', 'username profilePicture')
+            .populate('likes', 'username profilePicture')
+            .exec();
+    })
+    const postResponse = await Promise.all(postRequest);
+
+    const sortedPosts = postResponse.flat().sort((a, b) => b.timestamp - a.timestamp);
+    res.send(sortedPosts);
+}
+
 module.exports = {
     upload_post_image,
     get_post_image,
+    get_following_posts,
 }

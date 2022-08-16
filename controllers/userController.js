@@ -1,26 +1,9 @@
 const User = require('../models/user');
 const Post = require('../models/post');
+const Relationship = require('../models/relationship');
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-
-const get_following_posts = async (req, res) => {
-    // Recieve list of usernames to load posts for home page
-    const user = await User.findById(res.locals.user._id);
-    user.following.push(user._id);
-    const postRequest = user.following.map(f => {
-        return Post.find({ user: f })
-            .populate('user', 'username profilePicture')
-            .populate('comments', 'comment')
-            .populate('comments.user', 'username profilePicture')
-            .populate('likes', 'username profilePicture')
-            .exec();
-    })
-    const postResponse = await Promise.all(postRequest);
-
-    const sortedPosts = postResponse.flat().sort((a, b) => b.timestamp - a.timestamp);
-    res.send(sortedPosts);
-}
 
 const login_user = (req, res) => {
     User.findOne({ username: req.body.username }, function (err, user) {
@@ -174,8 +157,14 @@ const get_user_profile_page = (req, res) => {
                 .populate('comments.user', 'username profilePicture')
                 .populate('likes', 'username profilePicture')
                 .exec();
+
+            const followersList = await Relationship.find({ user: user._id });
+            const followingList = await Relationship.find({ follower: user._id });
+
+            const followers = followersList.map(u => u.follower);
+            const following = followingList.map(u => u.user);
     
-            res.send({ user, posts })
+            res.send({ user, posts, followers, following });
         }
         else {
             res.send({ err: "No User found"})
@@ -186,7 +175,6 @@ const get_user_profile_page = (req, res) => {
 
 module.exports = {
     checkAuthLoginToken,
-    get_following_posts,
     login_user,
     signup_user,
     search_user,
