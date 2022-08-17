@@ -158,8 +158,8 @@ const get_user_profile_page = (req, res) => {
                 .populate('likes', 'username profilePicture')
                 .exec();
 
-            const followersList = await Relationship.find({ user: user._id });
-            const followingList = await Relationship.find({ follower: user._id });
+            const followersList = await Relationship.find({ user: user._id }).populate('user', 'username profilePicture firstName lastName').populate('follower', 'username profilePicture firstName lastName');
+            const followingList = await Relationship.find({ follower: user._id }).populate('user', 'username profilePicture firstName lastName').populate('follower', 'username profilePicture firstName lastName');
 
             const followers = followersList.map(u => u.follower);
             const following = followingList.map(u => u.user);
