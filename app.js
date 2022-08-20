@@ -13,7 +13,7 @@ const relationshipRoutes = require('./routes/relationshipRoutes');
 const dbUrl = process.env.DBURL;
 let PORT = process.env.PORT;
 if( PORT == null || PORT == ""){
-    PORT = 8000;
+    PORT = 8080;
 }
 
 app.use(cors());
