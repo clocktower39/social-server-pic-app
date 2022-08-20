@@ -77,8 +77,16 @@ const get_following_posts = async (req, res) => {
     res.send(sortedPosts);
 }
 
+const like_post = async (req, res) => {
+    Post.update({ _id: req.body.id }, { $push: { likes: res.locals.user._id } }, (err, post) => {
+        if(err) return res.send(err);
+        res.sendStatus(200);
+    })
+}
+
 module.exports = {
     upload_post_image,
     get_post_image,
     get_following_posts,
+    like_post,
 }
