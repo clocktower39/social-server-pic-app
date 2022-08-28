@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get('/post/image/:id', postController.get_post_image);
 router.post('/post/upload', auth, uploadUserPost.single("file"), postController.upload_post_image);
+router.post('/post/delete', auth, postController.delete_post);
 router.get('/post/followingPosts', auth, postController.get_following_posts);
 router.post('/post/like', auth, postController.like_post);
 router.post('/post/unlike', auth, postController.unlike_post);

@@ -132,6 +132,18 @@ const unlike_comment_post = async (req, res) => {
   });
 };
 
+const delete_post = async (req, res) => {
+  let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'post'
+  });
+
+  Post.deleteOne({ _id: req.body.postId, user: res.locals.user._id }, (err, post) => {
+      if (err) return res.send(err);
+      gridfsBucket.delete(mongoose.Types.ObjectId(req.body.imageId));
+      return res.sendStatus(200);
+  })
+}
+
 module.exports = {
   upload_post_image,
   get_post_image,
@@ -142,4 +154,5 @@ module.exports = {
   delete_comment_post,
   like_comment_post,
   unlike_comment_post,
+  delete_post,
 };
