@@ -78,13 +78,20 @@ const search_user = (req, res) => {
 }
 
 const upload_profile_picture = (req, res) => {
-    User.findOneAndUpdate({ username: res.locals.user.username }, { profilePicture: res.req.file.id }, (err, user) => {
-        if (err) {
-            return res.send(err);
-        }
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'profilePicture'
+    });
 
-        console.log(res.req.file.filename)
-        return res.json({ src: res.req.file.filename })
+    User.findById(res.locals.user._id, (err, user) => {
+        if (err) return res.send(err);
+        if (user.profilePicture) {
+            gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
+        }
+        user.profilePicture = res.req.file.id;
+        user.save((err, u) => {
+            if (err) return res.send(err);
+            return res.sendStatus(200);
+        });
     })
 }
 
@@ -147,10 +154,10 @@ const delete_profile_picture = (req, res) => {
 const get_user_profile_page = (req, res) => {
     User.findOne({ username: req.params.username }, async function (err, user) {
         if (err) throw err;
-        if(user){
+        if (user) {
             user.email = undefined;
             user.password = undefined;
-    
+
             const posts = await Post.find({ user: user._id })
                 .populate('user', 'username profilePicture')
                 .populate('comments', 'comment')
@@ -163,11 +170,11 @@ const get_user_profile_page = (req, res) => {
 
             const followers = followersList.map(u => u.follower);
             const following = followingList.map(u => u.user);
-    
+
             res.send({ user, posts, followers, following });
         }
         else {
-            res.send({ err: "No User found"})
+            res.send({ err: "No User found" })
         }
 
     });
