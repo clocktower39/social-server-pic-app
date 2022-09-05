@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const app = express();
 const http = require('http').Server(app);
 const mongoose = require('mongoose');
+const { ValidationError } = require('express-validation');
 const cors = require('cors');
 require('dotenv').config();
 const methodOverride = require('method-override');
@@ -38,6 +39,15 @@ mongoose.connect(dbUrl,
       useFindAndModify: false,
   } , (err) => {
   console.log('mongo db connection', err)
+})
+
+// Error handling Function
+app.use((err, req, res, next) => {
+    if (err instanceof ValidationError) {
+      return res.status(err.statusCode).json(err)
+    }
+    console.error(err.stack);
+    res.status(500).send(err.stack);
 })
 
 let server = http.listen(PORT, ()=> {

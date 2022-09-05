@@ -77,6 +77,24 @@ const search_user = (req, res) => {
     }
 }
 
+const update_user = (req, res, next) => {
+  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true }, function (err, user) {
+    if (err) return next(err);
+    if (!user) {
+      res.send({
+        status: 'error',
+        err: err ? err : '',
+      })
+    }
+    else {
+      const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
+        expiresIn: "30d", // expires in 30 days
+      });
+      res.send({ status: 'Successful', accessToken });
+    }
+  })
+}
+
 const upload_profile_picture = (req, res) => {
     let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
         bucketName: 'profilePicture'
@@ -185,6 +203,7 @@ module.exports = {
     login_user,
     signup_user,
     search_user,
+    update_user,
     upload_profile_picture,
     get_profile_picture,
     delete_profile_picture,
