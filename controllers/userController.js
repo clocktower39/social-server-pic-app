@@ -63,6 +63,38 @@ const signup_user = (req, res) => {
     saveUser();
 }
 
+const change_password = (req, res, next) => {
+    User.findById({ email: res.locals.user._id }, function (err, user) {
+      if (err) return next(err);
+      if (!user) {
+        res.send({
+          error: { status: "User not found" },
+        });
+      } else {
+        user.comparePassword(req.body.currentPassword, function (err, isMatch) {
+          if (err) {
+            res.send({
+              error: { status: 'Incorrect Current Password' },
+            });
+          }
+          if (isMatch) {
+            user.password = req.body.newPassword;
+            user.save().then(savedUser => {
+              const accessToken = jwt.sign(savedUser._doc, ACCESS_TOKEN_SECRET, {
+                expiresIn: "30d", // expires in 30 days
+              });
+              res.send({ accessToken });
+            })
+          } else {
+            res.send({
+              error: { status: "Password change failed." },
+            });
+          }
+        });
+      }
+    });
+  };
+
 const search_user = (req, res) => {
     // if search string is empty, return no users instead of all
     if (req.body.username === '') {
@@ -202,6 +234,7 @@ module.exports = {
     checkAuthLoginToken,
     login_user,
     signup_user,
+    change_password,
     search_user,
     update_user,
     upload_profile_picture,
