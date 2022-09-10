@@ -64,7 +64,7 @@ const signup_user = (req, res) => {
 }
 
 const change_password = (req, res, next) => {
-    User.findById({ email: res.locals.user._id }, function (err, user) {
+    User.findById(res.locals.user._id, function (err, user) {
       if (err) return next(err);
       if (!user) {
         res.send({
