@@ -10,6 +10,7 @@ const methodOverride = require('method-override');
 const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
+const conversationRoutes = require('./routes/conversationRoutes');
 
 const dbUrl = process.env.DBURL;
 let PORT = process.env.PORT;
@@ -25,6 +26,7 @@ app.use(methodOverride('_method'));
 app.use('/', userRoutes);
 app.use('/', postRoutes);
 app.use('/', relationshipRoutes);
+app.use('/', conversationRoutes);
 
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
