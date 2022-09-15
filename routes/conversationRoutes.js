@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
+router.get('/conversation/getConversations', auth, conversationController.get_conversations);
 router.post('/conversation/create', auth, conversationController.create_conversation);
 router.post('/conversation/send', auth, conversationController.send_message);
 

@@ -18,6 +18,14 @@ const create_conversation = (req, res) => {
   saveConversation();
 };
 
+const get_conversations = async (req, res, next) => {
+  const conversations = await Conversation.find({ users: res.locals.user._id })
+    .populate("users", "username profilePicture")
+    .exec();
+
+    res.send(conversations);
+};
+
 const send_message = async (req, res) => {
   const newMessage = {
     user: res.locals.user._id,
@@ -35,5 +43,6 @@ const send_message = async (req, res) => {
 
 module.exports = {
   create_conversation,
+  get_conversations,
   send_message,
 };
