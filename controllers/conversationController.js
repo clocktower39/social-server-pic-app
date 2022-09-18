@@ -21,6 +21,7 @@ const create_conversation = (req, res) => {
 const get_conversations = async (req, res, next) => {
   const conversations = await Conversation.find({ users: res.locals.user._id })
     .populate("users", "username profilePicture")
+    .populate("messages.user", "username profilePicture")
     .exec();
 
     res.send(conversations);
