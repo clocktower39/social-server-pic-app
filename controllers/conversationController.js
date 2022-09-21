@@ -24,7 +24,7 @@ const get_conversations = async (req, res, next) => {
     .populate("messages.user", "username profilePicture")
     .exec();
 
-    res.send(conversations);
+  res.send(conversations);
 };
 
 const send_message = async (req, res) => {
@@ -32,12 +32,19 @@ const send_message = async (req, res) => {
     user: res.locals.user._id,
     message: req.body.message,
   }
-  Conversation.updateOne(
-    { _id: req.body.conversationId },
+  Conversation.findOneAndUpdate(
+    { _id: req.body.conversationId, users: res.locals.user._id },
     { $addToSet: { messages: newMessage } },
-    (err, post) => {
+    { new: true })
+    .populate("messages.user","username profilePicture")
+    .exec((err, convo) => {
       if (err) return res.send(err);
-      res.sendStatus(200);
+      if(convo){
+        res.send(convo);
+      }
+      else {
+        res.send({ error: 'Conversation not found.' })
+      }
     }
   );
 };
