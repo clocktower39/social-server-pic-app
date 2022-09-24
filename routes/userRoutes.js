@@ -9,17 +9,13 @@ const router = express.Router();
 
 const userUpdateValidate = {
     body: Joi.object({
-        firstName: Joi.string()
-            .required(),
-        lastName: Joi.string()
-            .required(),
-        username: Joi.string()
-            .required(),
-        email: Joi.string()
-            .email()
-            .required(),
+        firstName: Joi.string(),
+        lastName: Joi.string(),
+        username: Joi.string(),
+        email: Joi.string().email(),
         phoneNumber: Joi.string(),
         description: Joi.string(),
+        themeMode: Joi.string(),
     }),
 }
 

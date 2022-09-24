@@ -16,6 +16,7 @@ const UserSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "profilePictures.files"
     },
+    themeMode: { type: String, required: true, default: 'light', },
 }, { minimize: false });
 
 UserSchema.pre('save', function(next) {
