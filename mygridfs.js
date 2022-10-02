@@ -49,11 +49,13 @@ const userPostStorage = new GridFsStorage({
 });
 
 const uploadProfilePicture = multer({
-    storage: profilePictureStorage
+    storage: profilePictureStorage,
+    limits: { fileSize: 1000000}
 });
 
 const uploadUserPost = multer({
-    storage: userPostStorage
+    storage: userPostStorage,
+    limits: { fileSize: 30000000}
 });
 
 
