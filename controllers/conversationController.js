@@ -63,7 +63,7 @@ const send_message = async (req, res) => {
 const delete_message = async (req, res) => {
    Conversation.findOneAndUpdate(
     { _id: req.body.conversationId, users: res.locals.user._id },
-    { $pull: { "messages": { "_id": req.body.messageId } } },
+    { $pull: { "messages": { "_id": req.body.messageId, user: res.locals.user._id } } },
     { new: true })
     .populate("messages.user","username profilePicture")
     .exec((err, convo) => {

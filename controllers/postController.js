@@ -1,9 +1,6 @@
-const User = require("../models/user");
 const Post = require("../models/post");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 const upload_post_image = (req, res) => {
   let post = new Post(req.body);
