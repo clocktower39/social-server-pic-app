@@ -11,6 +11,13 @@ const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
+global.io = require('./io').initialize(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 const dbUrl = process.env.DBURL;
 let PORT = process.env.PORT;
@@ -31,6 +38,11 @@ app.use('/', conversationRoutes);
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
 })
+
+global.io.on('connection', (socket) => {
+    console.log(socket.conn.remoteAddress)
+    console.log('a user connected')
+});
 
 mongoose.set('useUnifiedTopology', true);
 mongoose.connect(dbUrl, 
