@@ -42,6 +42,11 @@ app.get('/', (req,res) => {
 global.io.on('connection', (socket) => {
     console.log(socket.conn.remoteAddress)
     console.log('a user connected')
+
+    socket.on('join', function (data) {
+      socket.join(data.conversationId); // We are using room of socket io
+      console.log(`joined ${data.conversationId}`)
+    });
 });
 
 mongoose.set('useUnifiedTopology', true);

@@ -51,6 +51,7 @@ const send_message = async (req, res) => {
     .exec((err, convo) => {
       if(err) return next(err);
       if(convo){
+        global.io.sockets.in(req.body.conversationId).emit('update_messages', convo);
         res.send(convo);
       }
       else {
@@ -69,6 +70,7 @@ const delete_message = async (req, res) => {
     .exec((err, convo) => {
       if(err) return next(err);
       if(convo){
+        global.io.sockets.in(req.body.conversationId).emit('update_messages', convo);
         res.send(convo);
       }
       else {
