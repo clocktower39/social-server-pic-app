@@ -95,19 +95,23 @@ const change_password = (req, res, next) => {
     });
   };
 
-const search_user = (req, res) => {
+  const search_user = (req, res) => {
+    const { username } = req.body;
+    
     // if search string is empty, return no users instead of all
-    if (req.body.username === '') {
-        res.send({ users: [] });
+    if (username === '') {
+      return res.send({ users: [] });
     }
-    else {
-        let searchUser = new RegExp(req.body.username, 'i');
-        User.find({ username: searchUser }, function (err, users) {
-            if (err) throw err;
-            res.send({ users: users })
-        });
-    }
-}
+  
+    const searchUser = new RegExp(username, 'i');
+    User.find({ username: searchUser }).limit(15).exec((err, users) => {
+      if (err) {
+        return res.status(500).send({ error: 'Error finding users' });
+      }
+      return res.send({ users });
+    });
+  }
+  
 
 const update_user = (req, res, next) => {
   User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true }, function (err, user) {

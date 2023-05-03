@@ -19,6 +19,30 @@ const upload_post_image = (req, res) => {
   savePost();
 };
 
+const get_explore_posts = async (req, res) => {
+  try {
+    const posts = await Post.aggregate([
+      { $sample: { size: 15 } }, // fetch 15 random posts
+      { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } }, // populate the user field
+      { $unwind: '$user' }, // destructure the user array to get the single user object
+      {
+        $lookup: {
+          from: 'post.files',
+          localField: 'image',
+          foreignField: '_id',
+          as: 'image'
+        }
+      },
+      { $unwind: '$image' }
+    ]);
+    res.json(posts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
 const get_post_image = (req, res) => {
   if (req.params.id) {
     let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
@@ -57,7 +81,7 @@ const get_following_posts = async (req, res) => {
   let following = followingList.map((r) => r.user);
   following.push(res.locals.user._id);
 
-  const postRequest = following.map((user) => {
+  const postRequest = following. map((user) => {
     return Post.find({ user })
       .populate("user", "username profilePicture")
       .populate("comments", "comment")
@@ -142,6 +166,7 @@ const delete_post = async (req, res) => {
 }
 
 module.exports = {
+  get_explore_posts,
   upload_post_image,
   get_post_image,
   get_following_posts,
