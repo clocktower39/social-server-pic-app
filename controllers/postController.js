@@ -2,21 +2,51 @@ const Post = require("../models/post");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 
-const upload_post_image = (req, res) => {
-  let post = new Post(req.body);
-  post.user = res.locals.user._id;
-  post.image = res.req.file.id;
-
-  let savePost = () => {
-    post.save((err) => {
-      if (err) {
-        res.send({ err: { ...err.errors } });
-      } else {
-        res.json({ src: res.req.file.filename });
-      }
+const upload_post_image = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "post"
     });
-  };
-  savePost();
+
+    // Create a new post instance
+    let post = new Post(req.body);
+    post.user = res.locals.user._id;
+
+    // Generate a random filename for the image
+    const filename = crypto.randomBytes(16).toString("hex") + path.extname(req.file.originalname);
+
+    // Upload the image to GridFS
+    const uploadStream = gridfsBucket.openUploadStream(filename, {
+      contentType: req.file.mimetype
+    });
+    uploadStream.end(req.file.buffer);
+
+    // Handle the upload completion
+    uploadStream.on('finish', async () => {
+      // Save the image's ObjectId in the post
+      post.image = new mongoose.Types.ObjectId(uploadStream.id);
+
+      // Save the post to the database
+      post.save((err) => {
+        if (err) {
+          return res.status(500).send({ error: err.errors });
+        }
+
+        // Respond with the uploaded image filename (or any other necessary data)
+        res.json({ src: filename });
+      });
+    });
+
+    uploadStream.on('error', (err) => {
+      console.error("Error during file upload:", err);
+      res.status(500).send({ error: "Error uploading file", err });
+    });
+
+  } catch (err) {
+    console.error("Error in post image upload process:", err);
+    res.status(500).send({ error: "Failed to upload post image", err });
+  }
 };
 
 const get_explore_posts = async (req, res) => {

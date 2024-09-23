@@ -1,65 +1,14 @@
-const { GridFsStorage } = require('multer-gridfs-storage');
-const multer = require('multer');
-const crypto = require('crypto');
-const path = require('path');
-require("dotenv").config();
+const multer = require("multer");
+const mongoose = require("mongoose");
 
-const dbUrl = process.env.DBURL;
+// Use memory storage to temporarily store the file in memory before uploading to GridFS
+const storage = multer.memoryStorage();
 
-// Profile Picture Storage
-const profilePictureStorage = new GridFsStorage({
-    url: dbUrl,
-    options: {useUnifiedTopology: true},
-    file: (req, file) => {
-        return new Promise((resolve, reject) => {
-            crypto.randomBytes(16, (err, buf) => {
-                if (err) {
-                    return reject(err);
-                }
-                const filename = buf.toString("hex") + path.extname(file.originalname);
-                const fileInfo = {
-                    filename: filename,
-                    bucketName: "profilePicture",
-                };
-                resolve(fileInfo);
-            });
-        });
-    }
+const uploadPicture = multer({
+  storage,
+  limits: { fileSize: 1000000 }, // 1MB limit
 });
-
-// Storage
-const userPostStorage = new GridFsStorage({
-    url: dbUrl,
-    options: {useUnifiedTopology: true},
-    file: (req, file) => {
-        return new Promise((resolve, reject) => {
-            crypto.randomBytes(16, (err, buf) => {
-                if (err) {
-                    return reject(err);
-                }
-                const filename = buf.toString("hex") + path.extname(file.originalname);
-                const fileInfo = {
-                    filename: filename,
-                    bucketName: "post",
-                };
-                resolve(fileInfo);
-            });
-        });
-    }
-});
-
-const uploadProfilePicture = multer({
-    storage: profilePictureStorage,
-    limits: { fileSize: 1000000}
-});
-
-const uploadUserPost = multer({
-    storage: userPostStorage,
-    limits: { fileSize: 30000000}
-});
-
 
 module.exports = {
-    uploadProfilePicture,
-    uploadUserPost
-}
+  uploadPicture,
+};

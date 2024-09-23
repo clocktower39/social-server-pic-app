@@ -49,16 +49,15 @@ global.io.on('connection', (socket) => {
     });
 });
 
-mongoose.set('useUnifiedTopology', true);
-mongoose.connect(dbUrl, 
-  {
-      useUnifiedTopology: true,
-      useNewUrlParser: true,
-      useCreateIndex: true,
-      useFindAndModify: false,
-  } , (err) => {
-  console.log('mongo db connection', err)
-})
+const connectToDB = async () => {
+  try {
+    await mongoose.connect(dbUrl);
+    console.log("MongoDB connection successful");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+  }
+};
+connectToDB();
 
 // Error handling Function
 app.use((err, req, res, next) => {
