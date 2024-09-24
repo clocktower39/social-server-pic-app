@@ -2,11 +2,11 @@ const Post = require("../models/post");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 
-const upload_post_image = async (req, res) => {
+const upload_post_image = async (req, res, next) => {
   try {
     const db = mongoose.connection.db;
     const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
-      bucketName: "post"
+      bucketName: "post",
     });
 
     // Create a new post instance
@@ -18,12 +18,12 @@ const upload_post_image = async (req, res) => {
 
     // Upload the image to GridFS
     const uploadStream = gridfsBucket.openUploadStream(filename, {
-      contentType: req.file.mimetype
+      contentType: req.file.mimetype,
     });
     uploadStream.end(req.file.buffer);
 
     // Handle the upload completion
-    uploadStream.on('finish', async () => {
+    uploadStream.on("finish", async () => {
       // Save the image's ObjectId in the post
       post.image = new mongoose.Types.ObjectId(uploadStream.id);
 
@@ -38,45 +38,44 @@ const upload_post_image = async (req, res) => {
       });
     });
 
-    uploadStream.on('error', (err) => {
+    uploadStream.on("error", (err) => {
       console.error("Error during file upload:", err);
       res.status(500).send({ error: "Error uploading file", err });
     });
-
   } catch (err) {
     console.error("Error in post image upload process:", err);
     res.status(500).send({ error: "Failed to upload post image", err });
   }
 };
 
-const get_explore_posts = async (req, res) => {
+const get_explore_posts = async (req, res, next) => {
   try {
     const posts = await Post.aggregate([
       { $sample: { size: 15 } }, // fetch 15 random posts
-      { $lookup: { from: 'users', localField: 'user', foreignField: '_id', as: 'user' } }, // populate the user field
-      { $unwind: '$user' }, // destructure the user array to get the single user object
+      { $lookup: { from: "users", localField: "user", foreignField: "_id", as: "user" } }, // populate the user field
+      { $unwind: "$user" }, // destructure the user array to get the single user object
       {
         $lookup: {
-          from: 'post.files',
-          localField: 'image',
-          foreignField: '_id',
-          as: 'image'
-        }
+          from: "post.files",
+          localField: "image",
+          foreignField: "_id",
+          as: "image",
+        },
       },
-      { $unwind: '$image' }
+      { $unwind: "$image" },
     ]);
     res.json(posts);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
-const get_post_image = async (req, res) => {
+const get_post_image = async (req, res, next) => {
   try {
     const db = mongoose.connection.db;
     const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
-      bucketName: "post"
+      bucketName: "post",
     });
 
     const files = await gridfsBucket
@@ -98,13 +97,13 @@ const get_post_image = async (req, res) => {
   }
 };
 
-const get_following_posts = async (req, res) => {
+const get_following_posts = async (req, res, next) => {
   // Recieve list of usernames to load posts for home page
   const followingList = await Relationship.find({ follower: res.locals.user._id });
   let following = followingList.map((r) => r.user);
   following.push(res.locals.user._id);
 
-  const postRequest = following. map((user) => {
+  const postRequest = following.map((user) => {
     return Post.find({ user })
       .populate("user", "username profilePicture")
       .populate("comments", "comment")
@@ -118,75 +117,76 @@ const get_following_posts = async (req, res) => {
   res.send(sortedPosts);
 };
 
-const like_post = async (req, res) => {
-  Post.updateOne(
-    { _id: req.body.id },
-    { $addToSet: { likes: res.locals.user._id } },
-    (err, post) => {
-      if (err) return res.send(err);
+const like_post = async (req, res, next) => {
+  Post.updateOne({ _id: req.body.id }, { $addToSet: { likes: res.locals.user._id } })
+    .then((post) => {
       res.sendStatus(200);
-    }
-  );
+    })
+    .catch((err) => next(err));
 };
 
-const unlike_post = async (req, res) => {
-  Post.updateOne({ _id: req.body.id }, { $pull: { likes: res.locals.user._id } }, (err, post) => {
-    if (err) return res.send(err);
-    res.sendStatus(200);
-  });
-};
-
-const comment_post = async (req, res) => {
-  Post.findById(req.body.id, (err, post) => {
-    if (err) return res.send(err);
-    post.comments.push({
-      user: res.locals.user._id,
-      comment: req.body.comment,
-      likes: [],
-    });
-    post.save((err, p) => {
-      if (err) return res.send(err);
-      return res.sendStatus(200);
-    });
-  });
-};
-
-const delete_comment_post = async (req, res) => {
-  Post.updateOne({ _id: req.body.id }, { $pull: { 'comments': { _id: req.body.commentId } } }, (err, post) => {
-    if (err) return res.send(err);
-    res.sendStatus(200);
-  });
-};
-
-const like_comment_post = async (req, res) => {
-  Post.updateOne(
-    { _id: req.body.id },
-    { $addToSet: { 'comments': { likes: res.locals.user._id } } },
-    (err, post) => {
-      if (err) return res.send(err);
+const unlike_post = async (req, res, next) => {
+  Post.updateOne({ _id: req.body.id }, { $pull: { likes: res.locals.user._id } })
+    .then((post) => {
       res.sendStatus(200);
-    }
-  );
+    })
+    .catch((err) => next(err));
 };
 
-const unlike_comment_post = async (req, res) => {
-  Post.updateOne({ _id: req.body.id }, { $pull: { 'comments' : { likes: res.locals.user._id } } }, (err, post) => {
-    if (err) return res.send(err);
-    res.sendStatus(200);
-  });
+const comment_post = async (req, res, next) => {
+  Post.findById(req.body.id)
+    .then((post) => {
+      post.comments.push({
+        user: res.locals.user._id,
+        comment: req.body.comment,
+        likes: [],
+      });
+      post
+        .save()
+        .then((p) => {
+          return res.sendStatus(200);
+        })
+        .catch((err) => next(err));
+    })
+    .catch((err) => next(err));
 };
 
-const delete_post = async (req, res) => {
+const delete_comment_post = async (req, res, next) => {
+  Post.updateOne({ _id: req.body.id }, { $pull: { comments: { _id: req.body.commentId } } })
+    .then((post) => {
+      res.sendStatus(200);
+    })
+    .catch((err) => next(err));
+};
+
+const like_comment_post = async (req, res, next) => {
+  Post.updateOne({ _id: req.body.id }, { $addToSet: { comments: { likes: res.locals.user._id } } })
+    .then((post) => {
+      res.sendStatus(200);
+    })
+    .catch((err) => next(err));
+};
+
+const unlike_comment_post = async (req, res, next) => {
+  Post.updateOne({ _id: req.body.id }, { $pull: { comments: { likes: res.locals.user._id } } })
+    .then((post) => {
+      res.sendStatus(200);
+    })
+    .catch((err) => next(err));
+};
+
+const delete_post = async (req, res, next) => {
   let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-      bucketName: 'post'
+    bucketName: "post",
   });
 
-  Post.deleteOne({ _id: req.body.postId, user: res.locals.user._id }, (err, post) => {
-      if (err) return res.send(err);
+  Post.deleteOne({ _id: req.body.postId, user: res.locals.user._id })
+    .then((post) => {
       gridfsBucket.delete(new mongoose.Types.ObjectId(req.body.imageId));
       return res.sendStatus(200);
-  })
-}
+    })
+    .catch((err) => next(err));
+};
 
 module.exports = {
   get_explore_posts,
