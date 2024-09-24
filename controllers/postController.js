@@ -72,36 +72,29 @@ const get_explore_posts = async (req, res) => {
   }
 };
 
-
-const get_post_image = (req, res) => {
-  if (req.params.id) {
-    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-      bucketName: "post",
+const get_post_image = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "post"
     });
 
-    gridfsBucket.find({ _id: mongoose.Types.ObjectId(req.params.id) }).toArray((err, files) => {
-      // Check if files
-      if (!files || files.length === 0) {
-        return res.status(404).json({
-          err: "No files exist",
-        });
-      }
+    const files = await gridfsBucket
+      .find({ _id: new mongoose.Types.ObjectId(req.params.id) })
+      .toArray();
 
-      // Check if image
-      if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
-        // Read output to browser
-        const readstream = gridfsBucket.openDownloadStream(files[0]._id);
-        readstream.pipe(res);
-      } else {
-        res.status(404).json({
-          err: "Not an image",
-        });
-      }
-    });
-  } else {
-    res.status(404).json({
-      err: "Missing parameter",
-    });
+    if (!files || files.length === 0) {
+      return res.status(404).json({ error: "No picture found" });
+    }
+
+    if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
+      const readstream = gridfsBucket.openDownloadStream(files[0]._id);
+      readstream.pipe(res);
+    } else {
+      res.status(404).json({ error: "File is not an image" });
+    }
+  } catch (err) {
+    res.status(500).send({ error: "Error retrieving post picture", err });
   }
 };
 
@@ -190,7 +183,7 @@ const delete_post = async (req, res) => {
 
   Post.deleteOne({ _id: req.body.postId, user: res.locals.user._id }, (err, post) => {
       if (err) return res.send(err);
-      gridfsBucket.delete(mongoose.Types.ObjectId(req.body.imageId));
+      gridfsBucket.delete(new mongoose.Types.ObjectId(req.body.imageId));
       return res.sendStatus(200);
   })
 }
