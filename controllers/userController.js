@@ -3,46 +3,73 @@ const Post = require('../models/post');
 const Relationship = require('../models/relationship');
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const { verifyRefreshToken } = require("../middleware/auth");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
-const login_user = (req, res) => {
-    User.findOne({ username: req.body.username }, function (err, user) {
-        if (err) throw err;
-        if (!user) {
-            res.send({
-                authenticated: false,
-                error: { username: 'Username not found' }
-            })
-        }
-        else {
-            user.comparePassword(req.body.password, function (err, isMatch) {
-                if (err) {
-                    res.send({
-                        authenticated: false,
-                    })
-                }
-                if (isMatch) {
-                    const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-                        expiresIn: '30d'
-                    });
-                    res.send({
-                        accessToken: accessToken,
-                    })
-                }
-                else {
-                    res.send({
-                        authenticated: false,
-                        error: { password: 'Incorrect Password' }
-                    })
-                }
-            });
-        }
-    });
-}
+const createTokens = (user) => {
+  const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
+    expiresIn: "180m", // Set a shorter expiration for access tokens
+  });
 
-const checkAuthLoginToken = (req, res) => {
-    res.send('Authorized')
-}
+  const refreshToken = jwt.sign(user._doc, REFRESH_TOKEN_SECRET, {
+    expiresIn: "90d", // Set a longer expiration for refresh tokens
+  });
+
+  return { accessToken, refreshToken };
+};
+
+const login_user = (req, res, next) => {
+  User.findOne({ username: req.body.username })
+    .then((user) => {
+      if (!user) {
+        res.send({
+          authenticated: false,
+          error: { username: "Username not found" },
+        });
+      } else {
+        user.comparePassword(req.body.password)
+          .then((isMatch) => {
+            if (isMatch) {
+              const tokens = createTokens(user);
+              res.send({
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+              });
+            } else {
+              res.send({
+                error: { password: "Incorrect Password" },
+              });
+            }
+          })
+          .catch((err) => {
+            console.error("Error comparing password:", err);
+            res.send({ error: err, authenticated: false })
+          });
+      }
+    })
+    .catch((err) => next(err));
+};
+
+const refresh_tokens = (req, res, next) => {
+  const { refreshToken } = req.body;
+
+  verifyRefreshToken(refreshToken)
+    .then((verifiedRefreshToken) => {
+      return User.findById(verifiedRefreshToken._id).exec();
+    })
+    .then((user) => {
+      if (!user) {
+        return res.status(404).send({ error: "User not found" });
+      }
+
+      const tokens = createTokens(user);
+      res.send({
+        accessToken: tokens.accessToken,
+      });
+    })
+    .catch((err) => res.status(403).send({ error: "Invalid refresh token", err }));
+};
 
 const signup_user = (req, res) => {
     let user = new User(req.body);
@@ -266,9 +293,9 @@ const get_user_profile_page = (req, res) => {
 }
 
 module.exports = {
-    checkAuthLoginToken,
     login_user,
     signup_user,
+    refresh_tokens,
     change_password,
     search_user,
     update_user,
