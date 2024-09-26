@@ -14,13 +14,12 @@ const create_conversation = (req, res, next) => {
         });
 
         let saveConversation = () => {
-          conversation.save((err, convo) => {
-            if (err) {
-              res.send({ err: { ...err.errors } });
-            } else {
+          conversation
+            .save()
+            .then((convo) => {
               res.send(convo);
-            }
-          });
+            })
+            .catch((err) => next(err));
         };
         saveConversation();
       }

@@ -1,6 +1,8 @@
 const Post = require("../models/post");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
+const crypto = require('crypto');
+const path = require('path');
 
 const upload_post_image = async (req, res, next) => {
   try {
@@ -28,14 +30,12 @@ const upload_post_image = async (req, res, next) => {
       post.image = new mongoose.Types.ObjectId(uploadStream.id);
 
       // Save the post to the database
-      post.save((err) => {
-        if (err) {
-          return res.status(500).send({ error: err.errors });
-        }
-
+      post.save()
+      .then(() => {
         // Respond with the uploaded image filename (or any other necessary data)
         res.json({ src: filename });
-      });
+      })
+      .catch((err) => next(err));
     });
 
     uploadStream.on("error", (err) => {
