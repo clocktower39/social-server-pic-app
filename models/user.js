@@ -16,6 +16,7 @@ const UserSchema = mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "profilePictures.files"
     },
+    isPrivate: { type: Boolean, required: true, default: false },
     themeMode: { type: String, required: true, default: 'light', },
 }, { minimize: false });
 
