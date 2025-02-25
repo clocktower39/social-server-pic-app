@@ -54,6 +54,7 @@ const get_explore_posts = async (req, res, next) => {
       { $sample: { size: 15 } }, // fetch 15 random posts
       { $lookup: { from: "users", localField: "user", foreignField: "_id", as: "user" } }, // populate the user field
       { $unwind: "$user" }, // destructure the user array to get the single user object
+      { $match: { "user.isPrivate": false } }, // Exclude posts from private accounts
       {
         $lookup: {
           from: "post.files",
