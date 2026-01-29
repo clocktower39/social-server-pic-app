@@ -1,4 +1,5 @@
 const Conversation = require("../models/conversation");
+const { createNotification } = require("../utils/notifications");
 
 const create_conversation = (req, res, next) => {
   const userList = [...req.body.users, res.locals.user._id];
@@ -49,8 +50,22 @@ const send_message = async (req, res, next) => {
   )
     .populate("messages.user", "username profilePicture")
     .exec()
-    .then((convo) => {
+    .then(async (convo) => {
       if (convo) {
+        const recipients = convo.users.filter(
+          (userId) => userId.toString() !== res.locals.user._id
+        );
+        await Promise.all(
+          recipients.map((recipientId) =>
+            createNotification({
+              user: recipientId,
+              actor: res.locals.user._id,
+              type: "message",
+              conversation: convo._id,
+              message: req.body.message,
+            })
+          )
+        );
         global.io.sockets.in(req.body.conversationId).emit("update_messages", convo);
         res.send(convo);
       } else {

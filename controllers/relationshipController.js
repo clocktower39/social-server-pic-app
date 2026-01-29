@@ -1,4 +1,5 @@
 const Relationship = require("../models/relationship");
+const { createNotification } = require("../utils/notifications");
 
 const get_relationships = (req, res, next) => {
   Relationship.find({ user: req.body.user })
@@ -37,7 +38,12 @@ const request_follow = (req, res, next) => {
       });
 
       let saveRelationship = () => {
-        relationship.save().then((newRelationship) => {
+        relationship.save().then(async (newRelationship) => {
+          await createNotification({
+            user: req.body.user,
+            actor: res.locals.user._id,
+            type: "follow",
+          });
           res.send(newRelationship)
         })
         .catch((err) => next(err));
@@ -51,7 +57,14 @@ const request_follow = (req, res, next) => {
 
 const request_unfollow = (req, res, next) => {
   Relationship.findOneAndDelete({ user: req.body.user, follower: res.locals.user._id })
-  .then((response) => {
+  .then(async (response) => {
+      if (response) {
+        await createNotification({
+          user: req.body.user,
+          actor: res.locals.user._id,
+          type: "unfollow",
+        });
+      }
       res.sendStatus(200);
   })
   .catch((err) => next(err));

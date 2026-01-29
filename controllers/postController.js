@@ -3,6 +3,7 @@ const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 const crypto = require('crypto');
 const path = require('path');
+const { createNotification } = require("../utils/notifications");
 
 const upload_post_image = async (req, res, next) => {
   try {
@@ -119,11 +120,29 @@ const get_following_posts = async (req, res, next) => {
 };
 
 const like_post = async (req, res, next) => {
-  Post.updateOne({ _id: req.body.id }, { $addToSet: { likes: res.locals.user._id } })
-    .then((post) => {
-      res.sendStatus(200);
-    })
-    .catch((err) => next(err));
+  try {
+    const post = await Post.findById(req.body.id).exec();
+    if (!post) {
+      return res.status(404).send({ error: "Post not found" });
+    }
+
+    const userId = res.locals.user._id.toString();
+    const alreadyLiked = post.likes.some((likeId) => likeId.toString() === userId);
+    if (!alreadyLiked) {
+      post.likes.addToSet(res.locals.user._id);
+      await post.save();
+      await createNotification({
+        user: post.user,
+        actor: userId,
+        type: "like",
+        post: post._id,
+      });
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    next(err);
+  }
 };
 
 const unlike_post = async (req, res, next) => {
@@ -135,21 +154,30 @@ const unlike_post = async (req, res, next) => {
 };
 
 const comment_post = async (req, res, next) => {
-  Post.findById(req.body.id)
-    .then((post) => {
-      post.comments.push({
-        user: res.locals.user._id,
-        comment: req.body.comment,
-        likes: [],
-      });
-      post
-        .save()
-        .then((p) => {
-          return res.sendStatus(200);
-        })
-        .catch((err) => next(err));
-    })
-    .catch((err) => next(err));
+  try {
+    const post = await Post.findById(req.body.id).exec();
+    if (!post) {
+      return res.status(404).send({ error: "Post not found" });
+    }
+
+    post.comments.push({
+      user: res.locals.user._id,
+      comment: req.body.comment,
+      likes: [],
+    });
+    await post.save();
+    await createNotification({
+      user: post.user,
+      actor: res.locals.user._id,
+      type: "comment",
+      post: post._id,
+      comment: req.body.comment,
+    });
+
+    return res.sendStatus(200);
+  } catch (err) {
+    next(err);
+  }
 };
 
 const delete_comment_post = async (req, res, next) => {

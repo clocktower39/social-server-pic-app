@@ -11,6 +11,8 @@ const userRoutes = require('./routes/userRoutes');
 const postRoutes = require('./routes/postRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const jwt = require('jsonwebtoken');
 global.io = require('./io').initialize(http, {
   cors: {
     origin: "*",
@@ -34,6 +36,7 @@ app.use('/', userRoutes);
 app.use('/', postRoutes);
 app.use('/', relationshipRoutes);
 app.use('/', conversationRoutes);
+app.use('/', notificationRoutes);
 
 app.get('/', (req,res) => {
     res.send(req.socket.remoteAddress);
@@ -46,6 +49,17 @@ global.io.on('connection', (socket) => {
     socket.on('join', function (data) {
       socket.join(data.conversationId); // We are using room of socket io
       console.log(`joined ${data.conversationId}`)
+    });
+
+    socket.on('join_user', function (data) {
+      try {
+        if (!data || !data.token) return;
+        const decoded = jwt.verify(data.token, process.env.ACCESS_TOKEN_SECRET);
+        if (!decoded || !decoded._id) return;
+        socket.join(`user:${decoded._id}`);
+      } catch (err) {
+        console.warn("Failed to join user room", err.message);
+      }
     });
 });
 
