@@ -3,296 +3,386 @@ const Post = require("../models/post");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const crypto = require('crypto');
-const path = require('path');
+const crypto = require("crypto");
+const path = require("path");
+const sharp = require("sharp");
 const { verifyRefreshToken } = require("../middleware/auth");
+const { resizeImage } = require("../utils/image");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
-const createTokens = (user) => {
-  const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-    expiresIn: "180m", // Set a shorter expiration for access tokens
-  });
+const ACCESS_TOKEN_EXPIRY = "180m";
+const REFRESH_TOKEN_EXPIRY = "90d";
 
-  const refreshToken = jwt.sign(user._doc, REFRESH_TOKEN_SECRET, {
-    expiresIn: "90d", // Set a longer expiration for refresh tokens
-  });
+const sanitizeUser = (user) => {
+  if (!user) return user;
+  const obj = typeof user.toObject === "function" ? user.toObject() : { ...user };
+  delete obj.password;
+  delete obj.email;
+  return obj;
+};
+
+const createTokens = (user) => {
+  const payload = typeof user.toObject === "function" ? user.toObject() : { ...user._doc };
+  delete payload.password;
+  delete payload.email;
+
+  const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
 
   return { accessToken, refreshToken };
 };
 
-const login_user = (req, res, next) => {
-  User.findOne({ username: req.body.username })
-    .then((user) => {
-      if (!user) {
-        res.send({
-          authenticated: false,
-          error: { username: "Username not found" },
-        });
-      } else {
-        user
-          .comparePassword(req.body.password)
-          .then((isMatch) => {
-            if (isMatch) {
-              const tokens = createTokens(user);
-              res.send({
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-              });
-            } else {
-              res.send({
-                error: { password: "Incorrect Password" },
-              });
-            }
-          })
-          .catch((err) => {
-            console.error("Error comparing password:", err);
-            res.send({ error: err, authenticated: false });
-          });
-      }
-    })
-    .catch((err) => next(err));
+const signAccessToken = (user) => {
+  const payload = typeof user.toObject === "function" ? user.toObject() : { ...user._doc };
+  delete payload.password;
+  delete payload.email;
+  return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
 };
 
-const refresh_tokens = (req, res, next) => {
-  const { refreshToken } = req.body;
-
-  verifyRefreshToken(refreshToken)
-    .then((verifiedRefreshToken) => {
-      return User.findById(verifiedRefreshToken._id).exec();
-    })
-    .then((user) => {
-      if (!user) {
-        return res.status(404).send({ error: "User not found" });
-      }
-
-      const tokens = createTokens(user);
-      res.send({
-        accessToken: tokens.accessToken,
-      });
-    })
-    .catch((err) => res.status(403).send({ error: "Invalid refresh token", err }));
-};
-
-const signup_user = (req, res, next) => {
-  let user = new User(req.body);
-
-  let saveUser = () => {
-    user
-      .save()
-      .then(() => {
-        res.send({
-          status: "success",
-          user,
-        });
-      })
-      .catch((err) => next(err));
-  };
-  saveUser();
-};
-
-const change_password = (req, res, next) => {
-  User.findById(res.locals.user._id)
-    .then((user) => {
-      if (!user) {
-        res.send({
-          error: { status: "User not found" },
-        });
-      } else {
-        user.comparePassword(req.body.currentPassword, function (err, isMatch) {
-          if (err) {
-            res.send({
-              error: { status: "Incorrect Current Password" },
-            });
-          }
-          if (isMatch) {
-            user.password = req.body.newPassword;
-            user.save().then((savedUser) => {
-              const accessToken = jwt.sign(savedUser._doc, ACCESS_TOKEN_SECRET, {
-                expiresIn: "30d", // expires in 30 days
-              });
-              res.send({ accessToken });
-            });
-          } else {
-            res.send({
-              error: { status: "Password change failed." },
-            });
-          }
-        });
-      }
-    })
-    .catch((err) => next(err));
-};
-
-const search_user = (req, res, next) => {
-  const { username } = req.body;
-
-  // if search string is empty, return no users instead of all
-  if (username === "") {
-    return res.send({ users: [] });
-  }
-
-  const searchUser = new RegExp(username, "i");
-  User.find({ username: searchUser })
-    .limit(15)
-    .exec()
-    .then((users) => {
-      return res.send({ users });
-    })
-    .catch((err) => next(err));
-};
-
-const update_user = (req, res, next) => {
-  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true })
-  .then((user) => {
+const login_user = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ username: req.body.username }).exec();
     if (!user) {
-      res.send({
-        status: "error",
-        err: "No user found",
-      });
-    } else {
-      const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-        expiresIn: "30d", // expires in 30 days
-      });
-      res.send({ status: "Successful", accessToken });
+      return res.status(404).json({ error: { username: "Username not found" } });
     }
-  }).catch((err) => next(err));
+    const isMatch = await user.comparePassword(req.body.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: { password: "Incorrect Password" } });
+    }
+    const tokens = createTokens(user);
+    res.json(tokens);
+  } catch (err) {
+    next(err);
+  }
 };
+
+const refresh_tokens = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    const verified = await verifyRefreshToken(refreshToken);
+    const user = await User.findById(verified._id).exec();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const accessToken = signAccessToken(user);
+    res.json({ accessToken });
+  } catch (err) {
+    res.status(403).json({ error: "Invalid refresh token" });
+  }
+};
+
+const signup_user = async (req, res, next) => {
+  try {
+    const user = new User(req.body);
+    const saved = await user.save();
+    res.status(201).json({ status: "success", user: sanitizeUser(saved) });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: { username: "Username already taken" } });
+    }
+    next(err);
+  }
+};
+
+const change_password = async (req, res, next) => {
+  try {
+    const user = await User.findById(res.locals.user._id).exec();
+    if (!user) {
+      return res.status(404).json({ error: { status: "User not found" } });
+    }
+    const isMatch = await user.comparePassword(req.body.currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ error: { status: "Incorrect current password" } });
+    }
+    user.password = req.body.newPassword;
+    const savedUser = await user.save();
+    const accessToken = signAccessToken(savedUser);
+    res.json({ accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const search_user = async (req, res, next) => {
+  try {
+    const { username } = req.body;
+    if (!username) {
+      return res.json({ users: [] });
+    }
+    const regex = new RegExp(escapeRegex(username), "i");
+    const users = await User.find({ username: regex })
+      .select("username firstName lastName profilePicture")
+      .limit(15)
+      .exec();
+    res.json({ users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const update_user = async (req, res, next) => {
+  try {
+    const updates = { ...req.body };
+    delete updates.password;
+    delete updates.profilePicture;
+    const user = await User.findByIdAndUpdate(res.locals.user._id, updates, { new: true }).exec();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const accessToken = signAccessToken(user);
+    res.json({ accessToken });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ error: "Username or email already in use" });
+    }
+    next(err);
+  }
+};
+
+const getBucket = (bucketName) =>
+  new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName });
 
 const upload_profile_picture = async (req, res, next) => {
   try {
-    const db = mongoose.connection.db;
-    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
-      bucketName: "profilePicture",
-    });
-
-    const user = await User.findById(res.locals.user._id);
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const gridfsBucket = getBucket("profilePicture");
+    const user = await User.findById(res.locals.user._id).exec();
     if (!user) {
-      return res.status(404).send({ error: "User not found" });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Check if the user has a profile picture before deleting
     if (user.profilePicture) {
-      const existingFile = await gridfsBucket
-        .find({ _id: new mongoose.Types.ObjectId(user.profilePicture) })
-        .toArray();
-
-      // Add a log to check the existing profile picture details
-      console.log("Checking if profile picture exists:", existingFile);
-
-      if (existingFile.length > 0) {
+      try {
         await gridfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
-      } else {
-        console.warn(`File not found for id ${user.profilePicture}, skipping delete.`);
+      } catch (err) {
+        console.warn("Could not delete old profile picture:", err.message);
       }
     }
 
-    const filename = crypto.randomBytes(16).toString("hex") + path.extname(req.file.originalname);
+    let processedBuffer;
+    let processedMime;
+    try {
+      const result = await resizeImage(req.file.buffer, req.file.mimetype, { maxDimension: 512, jpegQuality: 80 });
+      processedBuffer = result.buffer;
+      processedMime = result.mime;
+    } catch (err) {
+      console.warn("Profile picture resize failed, storing original:", err.message);
+      processedBuffer = req.file.buffer;
+      processedMime = req.file.mimetype;
+    }
 
-    // Upload the new profile picture to GridFS
+    const filename =
+      crypto.randomBytes(16).toString("hex") + (path.extname(req.file.originalname) || ".jpg");
+
     const uploadStream = gridfsBucket.openUploadStream(filename, {
-      contentType: req.file.mimetype,
+      contentType: processedMime,
     });
-    uploadStream.end(req.file.buffer);
-
-    uploadStream.on("finish", async () => {
-      // Save the new file ID to the user profile
-      user.profilePicture = new mongoose.Types.ObjectId(uploadStream.id);
-      const savedUser = await user.save();
-      const tokens = createTokens(savedUser);
-
-      res.status(200).json({
-        accessToken: tokens.accessToken,
-      });
-    });
+    uploadStream.end(processedBuffer);
 
     uploadStream.on("error", (err) => {
       console.error("Error during file upload:", err);
-      res.status(500).send({ error: "Error uploading file", err });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Error uploading file" });
+      }
+    });
+
+    uploadStream.on("finish", async () => {
+      try {
+        user.profilePicture = new mongoose.Types.ObjectId(uploadStream.id);
+        const savedUser = await user.save();
+        const tokens = createTokens(savedUser);
+        res.status(200).json({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          profilePicture: user.profilePicture.toString(),
+        });
+      } catch (err) {
+        console.error("Error saving user:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Failed to save profile picture" });
+        }
+      }
     });
   } catch (err) {
     console.error("Error in profile picture upload process:", err);
-    res.status(500).send({ error: "Failed to upload profile picture", err });
+    res.status(500).json({ error: "Failed to upload profile picture" });
   }
 };
 
 const get_profile_picture = async (req, res, next) => {
   try {
-    const db = mongoose.connection.db;
-    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
-      bucketName: "profilePicture",
-    });
-
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "No profile picture found" });
+    }
+    const gridfsBucket = getBucket("profilePicture");
     const files = await gridfsBucket
       .find({ _id: new mongoose.Types.ObjectId(req.params.id) })
       .toArray();
-
     if (!files || files.length === 0) {
       return res.status(404).json({ error: "No profile picture found" });
     }
 
-    if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
-      const readstream = gridfsBucket.openDownloadStream(files[0]._id);
-      readstream.pipe(res);
-    } else {
-      res.status(404).json({ error: "File is not an image" });
-    }
+    await streamProfilePicture(res, gridfsBucket, files[0]);
   } catch (err) {
-    res.status(500).send({ error: "Error retrieving profile picture", err });
+    console.error("get_profile_picture error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Error retrieving profile picture" });
+    }
   }
+};
+
+const detectImageFormat = (buf) => {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpeg";
+  if (
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
+    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
+  ) return "png";
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return "gif";
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) return "webp";
+  if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) {
+    const brand = buf.toString("ascii", 8, 12).toLowerCase();
+    if (["heic", "heix", "heim", "heis", "mif1", "msf1", "hevc", "hevx", "hevm"].includes(brand)) return "heic";
+    if (["avif", "avis"].includes(brand)) return "avif";
+    return "heif";
+  }
+  return null;
+};
+
+const formatToContentType = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/jpeg",
+  avif: "image/jpeg",
+  heif: "image/jpeg",
+};
+
+const streamProfilePicture = async (res, gridfsBucket, file) => {
+  const downloadStream = gridfsBucket.openDownloadStream(file._id);
+  const firstChunk = await new Promise((resolve, reject) => {
+    downloadStream.once("data", resolve);
+    downloadStream.once("error", reject);
+  });
+
+  const format = detectImageFormat(firstChunk);
+  if (!format) {
+    downloadStream.destroy();
+    return res.status(404).json({ error: "File is not an image" });
+  }
+
+  const needsReencode = format === "heic" || format === "heif" || format === "avif";
+
+  if (!needsReencode) {
+    res.set("Content-Type", formatToContentType[format] || "image/jpeg");
+    res.write(firstChunk);
+    downloadStream.on("error", (err) => {
+      if (!res.headersSent) res.status(500).end();
+      else res.end();
+    });
+    downloadStream.pipe(res);
+    return;
+  }
+
+  const chunks = [firstChunk];
+  downloadStream.on("data", (c) => chunks.push(c));
+  await new Promise((resolve) => {
+    downloadStream.on("end", resolve);
+    downloadStream.on("error", () => resolve());
+  });
+  const buffer = Buffer.concat(chunks);
+
+  res.set("Content-Type", "image/jpeg");
+  sharp(buffer, { failOn: "none" })
+    .rotate()
+    .resize({ width: 512, height: 512, fit: "cover" })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .on("error", (err) => {
+      console.error("Profile transform error:", err);
+      if (!res.headersSent) res.status(500).json({ error: "Error processing image" });
+      else res.end();
+    })
+    .pipe(res);
 };
 
 const delete_profile_picture = async (req, res, next) => {
   try {
-    const db = mongoose.connection.db;
-    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
-      bucketName: "profilePicture",
-    });
-
-    const user = await User.findById(res.locals.user._id);
-    if (user && user.profilePicture) {
-      await gridfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
-      user.profilePicture = undefined;
-      await user.save();
-      return res.sendStatus(200);
-    } else {
-      return res.sendStatus(204); // No content to delete
+    const gridfsBucket = getBucket("profilePicture");
+    const user = await User.findById(res.locals.user._id).exec();
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
+    if (!user.profilePicture) {
+      return res.status(204).send();
+    }
+    try {
+      await gridfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+    } catch (err) {
+      console.warn("Could not delete profile picture file:", err.message);
+    }
+    user.profilePicture = undefined;
+    await user.save();
+    res.json({ success: true });
   } catch (err) {
-    res.status(500).send({ error: "Failed to delete profile picture", err });
+    res.status(500).json({ error: "Failed to delete profile picture" });
   }
 };
 
-const get_user_profile_page = (req, res, next) => {
-  User.findOne({ username: req.params.username })
-    .then(async (user) => {
-      if (user) {
-        user.email = undefined;
-        user.password = undefined;
+const get_user_profile_page = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ username: req.params.username }).exec();
+    if (!user) {
+      return res.status(404).json({ error: "No user found" });
+    }
 
-        const posts = await Post.find({ user: user._id })
-          .populate("user", "username profilePicture")
-          .populate("comments", "comment")
-          .populate("comments.user", "username profilePicture")
-          .populate("likes", "username profilePicture")
-          .exec();
+    const [posts, followersList, followingList, isFollowing] = await Promise.all([
+      Post.find({ user: user._id })
+        .sort({ timestamp: -1 })
+        .populate("user", "username profilePicture firstName lastName")
+        .populate({
+          path: "comments",
+          populate: [
+            { path: "user", select: "username profilePicture" },
+            { path: "mentions", select: "username profilePicture" },
+          ],
+        })
+        .populate("tags.user", "username profilePicture")
+        .populate("likes", "username profilePicture")
+        .exec(),
+      Relationship.find({ user: user._id })
+        .populate("follower", "username profilePicture firstName lastName")
+        .exec(),
+      Relationship.find({ follower: user._id })
+        .populate("user", "username profilePicture firstName lastName")
+        .exec(),
+      Relationship.findOne({
+        user: user._id,
+        follower: req.user ? req.user._id : null,
+      }).exec(),
+    ]);
 
-        const followersList = await Relationship.find({ user: user._id })
-          .populate("user", "username profilePicture firstName lastName")
-          .populate("follower", "username profilePicture firstName lastName");
-        const followingList = await Relationship.find({ follower: user._id })
-          .populate("user", "username profilePicture firstName lastName")
-          .populate("follower", "username profilePicture firstName lastName");
+    const followers = followersList.map((u) => u.follower);
+    const following = followingList.map((u) => u.user);
 
-        const followers = followersList.map((u) => u.follower);
-        const following = followingList.map((u) => u.user);
-
-        res.send({ user, posts, followers, following });
-      } else {
-        res.send({ err: "No User found" });
-      }
-    })
-    .catch((err) => next(err));
+    res.json({
+      user: sanitizeUser(user),
+      posts,
+      followers,
+      following,
+      isFollowing: Boolean(isFollowing),
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 module.exports = {
@@ -306,4 +396,5 @@ module.exports = {
   get_profile_picture,
   delete_profile_picture,
   get_user_profile_page,
+  sanitizeUser,
 };

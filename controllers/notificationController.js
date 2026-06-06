@@ -6,14 +6,18 @@ const get_notifications = async (req, res, next) => {
       Notification.find({ user: res.locals.user._id })
         .sort({ createdAt: -1 })
         .limit(100)
-        .populate("actor", "username profilePicture")
-        .populate("post", "image user")
-        .populate("conversation", "users")
+        .populate("actor", "username profilePicture firstName lastName")
+        .populate({
+          path: "post",
+          select: "image user caption",
+          populate: { path: "user", select: "username" },
+        })
+        .populate("conversation", "users isGroup name")
         .exec(),
       Notification.countDocuments({ user: res.locals.user._id, read: false }),
     ]);
 
-    res.send({ notifications, unreadCount });
+    res.json({ notifications, unreadCount });
   } catch (err) {
     next(err);
   }
@@ -21,12 +25,13 @@ const get_notifications = async (req, res, next) => {
 
 const mark_notifications_read = async (req, res, next) => {
   try {
-    const { ids, all } = req.body || {};
+    const { ids = [], all = false } = req.body || {};
     const query = { user: res.locals.user._id };
+
     if (Array.isArray(ids) && ids.length > 0) {
       query._id = { $in: ids };
     } else if (!all) {
-      return res.status(400).send({ error: "No notification ids provided." });
+      return res.status(400).json({ error: "No notification ids provided" });
     }
 
     await Notification.updateMany(query, { $set: { read: true } }).exec();
@@ -35,7 +40,7 @@ const mark_notifications_read = async (req, res, next) => {
       read: false,
     });
 
-    res.send({ unreadCount, updatedIds: ids && ids.length ? ids : "all" });
+    res.json({ unreadCount, updatedIds: ids.length ? ids : "all" });
   } catch (err) {
     next(err);
   }

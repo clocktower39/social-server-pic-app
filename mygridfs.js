@@ -1,14 +1,15 @@
 const multer = require("multer");
-const mongoose = require("mongoose");
 
-// Use memory storage to temporarily store the file in memory before uploading to GridFS
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
 const storage = multer.memoryStorage();
 
 const uploadPicture = multer({
   storage,
-  limits: { fileSize: 1000000 }, // 1MB limit
+  limits: { fileSize: MAX_UPLOAD_BYTES },
 });
 
 module.exports = {
   uploadPicture,
+  MAX_UPLOAD_BYTES,
 };
