@@ -1,11 +1,11 @@
 const express = require('express');
 const postController = require('../controllers/postController');
-const { verifyAccessToken } = require("../middleware/auth");
+const { verifyAccessToken, verifyAccessTokenOptional } = require("../middleware/auth");
 const { uploadPicture } = require("../mygridfs");
 
 const router = express.Router();
 
-router.get('/explore', verifyAccessToken, postController.get_explore_posts);
+router.get('/explore', verifyAccessTokenOptional, postController.get_explore_posts);
 router.get('/explore/tags/trending', postController.get_trending_tags);
 router.get('/explore/tags/:tag', postController.get_posts_by_tag);
 router.get('/post/image/:id', postController.get_post_image);

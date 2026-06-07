@@ -5,13 +5,24 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 const verifyAccessToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; 
+  const token = authHeader && authHeader.split(' ')[1];
 
   if(token === null) return res.status(401).send("A token is required for authentication");
   jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
       if(err) return res.sendStatus(403);
       res.locals.user = user;
       next();
+  });
+};
+
+const verifyAccessTokenOptional = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return next();
+  jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
+    if (err) return next();
+    res.locals.user = user;
+    next();
   });
 };
 
@@ -26,5 +37,6 @@ const verifyRefreshToken = (refreshToken) => {
 
 module.exports = {
   verifyAccessToken,
+  verifyAccessTokenOptional,
   verifyRefreshToken
 };

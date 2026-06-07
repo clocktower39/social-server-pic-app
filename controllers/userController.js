@@ -344,30 +344,46 @@ const get_user_profile_page = async (req, res, next) => {
       return res.status(404).json({ error: "No user found" });
     }
 
-    const [posts, followersList, followingList, isFollowing] = await Promise.all([
-      Post.find({ user: user._id })
-        .sort({ timestamp: -1 })
-        .populate("user", "username profilePicture firstName lastName")
-        .populate({
-          path: "comments",
-          populate: [
-            { path: "user", select: "username profilePicture" },
-            { path: "mentions", select: "username profilePicture" },
-          ],
-        })
-        .populate("tags.user", "username profilePicture")
-        .populate("likes", "username profilePicture")
-        .exec(),
+    const viewer = res.locals.user;
+    let canViewPosts = !user.isPrivate;
+    let isFollowing = false;
+    if (user.isPrivate && viewer) {
+      if (viewer._id.toString() === user._id.toString()) {
+        canViewPosts = true;
+      } else {
+        const rel = await Relationship.findOne({
+          user: user._id,
+          follower: viewer._id,
+        }).exec();
+        isFollowing = Boolean(rel);
+        canViewPosts = isFollowing;
+      }
+    } else if (user.isPrivate && !viewer) {
+      canViewPosts = false;
+    }
+
+    const [posts, followersList, followingList] = await Promise.all([
+      canViewPosts
+        ? Post.find({ user: user._id })
+            .sort({ timestamp: -1 })
+            .populate("user", "username profilePicture firstName lastName")
+            .populate({
+              path: "comments",
+              populate: [
+                { path: "user", select: "username profilePicture" },
+                { path: "mentions", select: "username profilePicture" },
+              ],
+            })
+            .populate("tags.user", "username profilePicture")
+            .populate("likes", "username profilePicture")
+            .exec()
+        : Promise.resolve([]),
       Relationship.find({ user: user._id })
         .populate("follower", "username profilePicture firstName lastName")
         .exec(),
       Relationship.find({ follower: user._id })
         .populate("user", "username profilePicture firstName lastName")
         .exec(),
-      Relationship.findOne({
-        user: user._id,
-        follower: req.user ? req.user._id : null,
-      }).exec(),
     ]);
 
     const followers = followersList.map((u) => u.follower);
@@ -378,7 +394,7 @@ const get_user_profile_page = async (req, res, next) => {
       posts,
       followers,
       following,
-      isFollowing: Boolean(isFollowing),
+      isFollowing,
     });
   } catch (err) {
     next(err);
