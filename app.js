@@ -13,6 +13,16 @@ const relationshipRoutes = require('./routes/relationshipRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
+const requiredEnv = ['DBURL', 'ACCESS_TOKEN_SECRET', 'REFRESH_TOKEN_SECRET'];
+const missingEnv = requiredEnv.filter((k) => !process.env[k]);
+if (missingEnv.length > 0) {
+  console.error(
+    `Missing required environment variables: ${missingEnv.join(', ')}. ` +
+    `Set them via "heroku config:set NAME=value" or a .env file.`
+  );
+  process.exit(1);
+}
+
 const app = express();
 const server = http.createServer(app);
 
@@ -41,6 +51,10 @@ app.get('/', (req, res) => {
   res.json({ status: "ok", service: "social-picture-app" });
 });
 
+app.get('/healthz', (req, res) => {
+  res.json({ status: "ok", db: mongoose.connection.readyState });
+});
+
 global.io.on('connection', (socket) => {
   socket.on('join', (data) => {
     if (data && data.conversationId) {
@@ -65,10 +79,6 @@ global.io.on('connection', (socket) => {
 });
 
 const connectToDB = async () => {
-  if (!DBURL) {
-    console.error("DBURL is not set. Set it in .env");
-    return;
-  }
   try {
     await mongoose.connect(DBURL);
     console.log("MongoDB connection successful");

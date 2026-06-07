@@ -1,11 +1,15 @@
 {
   "name": "social-server-pic-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "Express + Mongoose backend for the Social Photo App",
   "main": "app.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +25,6 @@
     "method-override": "^3.0.0",
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
-    "nodemon": "^3.1.11",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3"
   }
