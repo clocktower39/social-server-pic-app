@@ -18,6 +18,9 @@ const ConversationSchema = new mongoose.Schema(
     users: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], required: true },
     messages: { type: [MessageSchema], default: [] },
     lastMessageAt: { type: Date, default: Date.now, index: true },
+    deletedBy: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], default: [] },
+    archivedBy: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], default: [] },
+    mutedBy: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], default: [] },
   },
   { minimize: false }
 );

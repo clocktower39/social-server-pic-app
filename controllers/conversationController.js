@@ -56,7 +56,12 @@ const create_conversation = async (req, res, next) => {
 
 const get_conversations = async (req, res, next) => {
   try {
-    const conversations = await Conversation.find({ users: res.locals.user._id })
+    const me = res.locals.user._id;
+    const conversations = await Conversation.find({
+      users: me,
+      deletedBy: { $ne: me },
+      archivedBy: { $ne: me },
+    })
       .populate("users", "username profilePicture firstName lastName")
       .populate({
         path: "messages.user",
@@ -287,6 +292,82 @@ const rename_group = async (req, res, next) => {
   }
 };
 
+const delete_conversation = async (req, res, next) => {
+  try {
+    const { conversationId } = req.body;
+    const convo = await Conversation.findOneAndUpdate(
+      { _id: conversationId, users: res.locals.user._id },
+      { $addToSet: { deletedBy: res.locals.user._id } },
+      { new: true }
+    ).exec();
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+
+    if (convo.isGroup && convo.users.length > 0) {
+      const remaining = convo.users.filter(
+        (u) => !convo.deletedBy.some((d) => d.toString() === u.toString())
+      );
+      if (remaining.length === 0) {
+        await Conversation.deleteOne({ _id: conversationId });
+      }
+    }
+    res.json({ success: true, conversationId });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const archive_conversation = async (req, res, next) => {
+  try {
+    const { conversationId, archived = true } = req.body;
+    const update = archived
+      ? { $addToSet: { archivedBy: res.locals.user._id } }
+      : { $pull: { archivedBy: res.locals.user._id } };
+    const convo = await Conversation.findOneAndUpdate(
+      { _id: conversationId, users: res.locals.user._id },
+      update,
+      { new: true }
+    ).exec();
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    res.json({ success: true, archived: Boolean(archived), conversationId });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const mute_conversation = async (req, res, next) => {
+  try {
+    const { conversationId, muted = true } = req.body;
+    const update = muted
+      ? { $addToSet: { mutedBy: res.locals.user._id } }
+      : { $pull: { mutedBy: res.locals.user._id } };
+    const convo = await Conversation.findOneAndUpdate(
+      { _id: conversationId, users: res.locals.user._id },
+      update,
+      { new: true }
+    ).exec();
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    res.json({ success: true, muted: Boolean(muted), conversationId });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const mark_unread = async (req, res, next) => {
+  try {
+    const { conversationId } = req.body;
+    const convo = await Conversation.findOne(
+      { _id: conversationId, users: res.locals.user._id }
+    )
+      .populate("users", "username profilePicture firstName lastName")
+      .populate({ path: "messages.user", select: "username profilePicture" })
+      .exec();
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    res.json({ success: true, conversationId, conversation: convo });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   create_conversation,
   get_conversations,
@@ -297,5 +378,9 @@ module.exports = {
   remove_member,
   leave_conversation,
   rename_group,
+  delete_conversation,
+  archive_conversation,
+  mute_conversation,
+  mark_unread,
   sortConversations,
 };
